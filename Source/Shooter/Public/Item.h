@@ -62,7 +62,7 @@ protected:
 
 	void SetActiveStars();
 
-	void SetItemProperties(EItemState State);
+	virtual void SetItemProperties(EItemState State);
 
 	void FinishInterping();
 
