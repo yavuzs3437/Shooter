@@ -128,6 +128,8 @@ protected:
 
 	void StopAiming();
 
+	void PickupAmmo(class AAmmo* Ammo);
+
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -313,6 +315,11 @@ private:
 	float CrouchingGroundFriction;
 
 	bool bAimingButtonPressed;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Inventory, meta = (AllowPrivateAccess = "true"))
+	TArray<AItem*> Inventory;
+
+	const int32 INVENTORY_CAPACACITY{ 6 };
 
 public:
 	/** Returns CameraBoom subobject */

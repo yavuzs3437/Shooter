@@ -16,6 +16,7 @@
 #include "Components/SphereComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Ammo.h"
 
 // Sets default values
 AShooterCharacter::AShooterCharacter() :
@@ -115,7 +116,7 @@ void AShooterCharacter::BeginPlay()
 	}
 
 	EquipWeapon(SpawnDefaultWeapon());
-
+	Inventory.Add(EquippedWeapon);
 	InitializeAmmoMap();
 	GetCharacterMovement()->MaxWalkSpeed = BaseMovementSpeed;
 }
@@ -495,11 +496,6 @@ void AShooterCharacter::SelectButtonPressed()
 	if (TraceHitItem) 
 	{
 		TraceHitItem->StartItemCurve(this);
-
-		if(TraceHitItem->GetPickupSound())
-		{
-			UGameplayStatics::PlaySound2D(this, TraceHitItem->GetPickupSound());
-		}
 	}
 }
 
@@ -745,6 +741,26 @@ void AShooterCharacter::StopAiming()
 	}
 }
 
+void AShooterCharacter::PickupAmmo(AAmmo* Ammo)
+{
+	if(AmmoMap.Find(Ammo->GetAmmoType()))
+	{
+		int32 AmmoCount{ AmmoMap[Ammo->GetAmmoType()] };
+		AmmoCount += Ammo->GetItemCount();
+		AmmoMap[Ammo->GetAmmoType()] = AmmoCount;
+	}
+
+	if(EquippedWeapon->GetAmmoType() == Ammo->GetAmmoType())
+	{
+		if(EquippedWeapon->GetAmmo() == 0)
+		{
+			ReloadWeapon();
+		}
+	}
+
+	Ammo->Destroy();
+}
+
 // Called every frame
 void AShooterCharacter::Tick(float DeltaTime)
 {
@@ -836,6 +852,19 @@ void AShooterCharacter::GetPickupItem(AItem* Item)
 	auto Weapon = Cast<AWeapon>(Item);
 	if(Weapon)
 	{
-		SwapWeapon(Weapon);
+		if(Inventory.Num() < INVENTORY_CAPACACITY)
+		{
+			Inventory.Add(Weapon);
+		}
+		else
+		{
+			SwapWeapon(Weapon);
+		}
+	}
+
+	auto Ammo = Cast<AAmmo>(Item);
+	if(Ammo)
+	{
+		PickupAmmo(Ammo);
 	}
 }
