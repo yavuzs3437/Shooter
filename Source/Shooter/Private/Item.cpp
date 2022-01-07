@@ -27,7 +27,9 @@ AItem::AItem():
 	
 	InterpInitialYawOffset(0.f),
 
-	SlotIndex(0)
+	SlotIndex(0),
+	
+	bCharacterInventoryFull(false)
 {
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -80,6 +82,15 @@ void AItem::OnSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* Ot
 
 void AItem::OnSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
+	if (OtherActor)
+	{
+		AShooterCharacter* ShooterCharacter = Cast<AShooterCharacter>(OtherActor);
+		if (ShooterCharacter)
+		{
+			//ShooterCharacter->IncrementOverlappedItemCount(-1, ID);
+			ShooterCharacter->UnHighlightInventorySlot();
+		}
+	}
 }
 
 void AItem::SetActiveStars()
@@ -154,6 +165,7 @@ void AItem::SetItemProperties(EItemState State)
 	case EItemState::EIS_Falling:
 		ItemMesh->SetSimulatePhysics(true);
 		ItemMesh->SetEnableGravity(true);
+		ItemMesh->SetVisibility(true);
 		ItemMesh->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
 		ItemMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		ItemMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_WorldStatic, ECollisionResponse::ECR_Block);
@@ -210,6 +222,8 @@ void AItem::FinishInterping()
 	if(Character)
 	{
 		Character->GetPickupItem(this);
+
+		Character->UnHighlightInventorySlot();
 	}
 	SetActorScale3D(FVector(1.f));
 }
@@ -250,6 +264,69 @@ void AItem::ItemInterp(float DeltaTime)
 	}
 }
 
+void AItem::PlayPickupSound(bool bForcePlaySound)
+{
+	if (bForcePlaySound) 
+	{
+		if(PickupSound)
+		{
+			UGameplayStatics::PlaySound2D(this, PickupSound);
+		}
+	}
+
+	else if (Character)
+	{
+		if (Character->ShouldPlayPickupSound())
+		{
+			Character->StartPickupSoundTimer();
+			if (EquipSound)
+			{
+				UGameplayStatics::PlaySound2D(this, PickupSound);
+			}
+		}
+	}
+}
+
+void AItem::OnConstruction(const FTransform& Transform)
+{
+	FString RarityTablePath(TEXT("DataTable'/Game/_Game/DataTable/ItemRarityDataTable.ItemRarityDataTable'"));
+	UDataTable* RarityTableObject = Cast<UDataTable>(StaticLoadObject(UDataTable::StaticClass(), nullptr, *RarityTablePath));
+
+	if(RarityTableObject)
+	{
+		FItemRarityTable* RarityRow = nullptr;
+
+		switch (ItemRarity) 
+		{
+		case EItemRarity::EIR_Damaged:
+			RarityRow = RarityTableObject->FindRow<FItemRarityTable>(FName("Damaged"), TEXT(""));
+			break;
+		case EItemRarity::EIR_Common:
+			RarityRow = RarityTableObject->FindRow<FItemRarityTable>(FName("Common"), TEXT(""));
+			break;
+		case EItemRarity::EIR_Uncommon:
+			RarityRow = RarityTableObject->FindRow<FItemRarityTable>(FName("Uncommon"), TEXT(""));
+			break;
+		case EItemRarity::EIR_Rare:
+			RarityRow = RarityTableObject->FindRow<FItemRarityTable>(FName("Rare"), TEXT(""));
+			break;
+		case EItemRarity::EIR_Legendary:
+			RarityRow = RarityTableObject->FindRow<FItemRarityTable>(FName("Legendary"), TEXT(""));
+			break;
+		}
+
+		if(RarityRow)
+		{
+			GlowColor = RarityRow->GlowColor;
+			LightColor = RarityRow->LightColor;
+			DarkColor = RarityRow->DarkColor;
+			NumberOfStars = RarityRow->NumberOfStars;
+			IconBackground = RarityRow->IconBackground;
+		}
+	}
+
+}
+
 // Called every frame
 void AItem::Tick(float DeltaTime)
 {
@@ -259,13 +336,35 @@ void AItem::Tick(float DeltaTime)
 
 }
 
+void AItem::PlayEquipSound(bool bForcePlaySound)
+{
+	if(Character)
+	{
+		if(bForcePlaySound)
+		{
+			if (EquipSound) 
+			{
+				UGameplayStatics::PlaySound2D(this, EquipSound);
+			}
+		}
+		else if(Character->ShouldPlayEquipSound())
+		{
+			Character->StartEquipSoundTimer();
+			if (EquipSound) 
+			{
+				UGameplayStatics::PlaySound2D(this, EquipSound);
+			}
+		}
+	}
+}
+
 void AItem::SetItemState(EItemState State)
 {
 	ItemState = State;
 	SetItemProperties(State);
 }
 
-void AItem::StartItemCurve(AShooterCharacter* Char)
+void AItem::StartItemCurve(AShooterCharacter* Char, bool BForcePlaySound)
 {
 	Character = Char;
 
