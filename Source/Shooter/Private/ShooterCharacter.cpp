@@ -17,6 +17,8 @@
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Ammo.h"
+#include "BulletHitInterface.h"
+#include "Enemy.h"
 
 // Sets default values
 AShooterCharacter::AShooterCharacter() :
@@ -603,14 +605,49 @@ void AShooterCharacter::SendBullet()
 			SocketTransform.GetLocation(), BeamHitResult);
 		if (bBeamEnd)
 		{
-			if (ImpactParticles)
+			if(BeamHitResult.Actor.IsValid())
 			{
-				UGameplayStatics::SpawnEmitterAtLocation(
-					GetWorld(),
-					ImpactParticles,
-					BeamHitResult.Location);
-			}
+				IBulletHitInterface* BulletHitInterface = Cast<IBulletHitInterface>(BeamHitResult.Actor.Get());
+				if(BulletHitInterface)
+				{
+					BulletHitInterface->BulletHit_Implementation(BeamHitResult);
+				}
 
+				AEnemy* HitEnemy = Cast<AEnemy>(BeamHitResult.Actor.Get());
+
+				if(HitEnemy)
+				{
+					if(BeamHitResult.BoneName.ToString() == HitEnemy->GetHeadBone())
+					{
+						UGameplayStatics::ApplyDamage(
+							BeamHitResult.Actor.Get(),
+							EquippedWeapon->GetHeadShotDamage(),
+							GetController(),
+							this,
+							UDamageType::StaticClass());
+					}
+					else
+					{
+						UGameplayStatics::ApplyDamage(
+							BeamHitResult.Actor.Get(),
+							EquippedWeapon->GetDamage(),
+							GetController(),
+							this, 
+							UDamageType::StaticClass());
+					}
+				}
+			}
+			else
+			{
+				if (ImpactParticles)
+				{
+					UGameplayStatics::SpawnEmitterAtLocation(
+						GetWorld(),
+						ImpactParticles,
+						BeamHitResult.Location);
+				}
+			}
+			
 			UParticleSystemComponent* Beam = UGameplayStatics::SpawnEmitterAtLocation(
 				GetWorld(),
 				BeamParticles,
